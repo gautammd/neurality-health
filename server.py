@@ -1,80 +1,72 @@
 """FastAPI backend for metrics and health checks."""
+import json
 import os
-import time
+from datetime import datetime
+from pathlib import Path
 
 import structlog
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI
 
 load_dotenv()
 log = structlog.get_logger()
 
 app = FastAPI(title="Neurality Health Voice Agent")
 
-# Simple metrics tracking
-_metrics = {
-    "calls_total": 0,
-    "calls_completed": 0,
-    "calls_failed": 0,
-    "call_durations_sec": [],
-}
+AUDIT_DIR = Path(__file__).parent / "sample_outputs"
 
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
     return {"status": "healthy"}
 
 
 @app.get("/metrics")
 async def metrics():
-    """Metrics endpoint for monitoring."""
-    durations = _metrics["call_durations_sec"]
+    """Metrics from audit files."""
+    if not AUDIT_DIR.exists():
+        return {"calls": {"total": 0, "booked": 0, "not_booked": 0}, "performance": {}}
+
+    total = 0
+    booked = 0
+    durations = []
+    tool_latencies = []
+
+    for file in AUDIT_DIR.glob("call-*.json"):
+        try:
+            data = json.loads(file.read_text())
+            total += 1
+
+            if data.get("outcome", {}).get("booked"):
+                booked += 1
+
+            # Duration
+            started = data.get("started_at")
+            ended = data.get("ended_at")
+            if started and ended:
+                start_dt = datetime.fromisoformat(started)
+                end_dt = datetime.fromisoformat(ended)
+                durations.append((end_dt - start_dt).total_seconds())
+
+            # Tool latencies
+            for trace in data.get("tool_trace", []):
+                if "duration_ms" in trace:
+                    tool_latencies.append(trace["duration_ms"])
+        except Exception:
+            continue
 
     return {
         "calls": {
-            "total": _metrics["calls_total"],
-            "completed": _metrics["calls_completed"],
-            "failed": _metrics["calls_failed"],
+            "total": total,
+            "booked": booked,
+            "not_booked": total - booked,
         },
-        "call_duration": {
-            "avg_sec": sum(durations) / len(durations) if durations else 0,
-            "total_calls_with_duration": len(durations),
+        "performance": {
+            "avg_call_duration_sec": round(sum(durations) / len(durations), 2) if durations else 0,
+            "total_tool_calls": len(tool_latencies),
+            "avg_tool_latency_ms": round(sum(tool_latencies) / len(tool_latencies), 2) if tool_latencies else 0,
         },
     }
-
-
-@app.post("/voice/status")
-async def voice_status(
-    request: Request,
-    CallSid: str = Form(default=""),
-    CallStatus: str = Form(default=""),
-    Duration: str = Form(default=""),
-):
-    """
-    Twilio call status webhook (optional).
-    Configure in Twilio to track call outcomes.
-    """
-    log.info(
-        "call_status_update",
-        call_sid=CallSid,
-        status=CallStatus,
-        duration=Duration,
-    )
-
-    _metrics["calls_total"] += 1
-
-    if CallStatus == "completed":
-        _metrics["calls_completed"] += 1
-        if Duration:
-            try:
-                _metrics["call_durations_sec"].append(int(Duration))
-            except ValueError:
-                pass
-    elif CallStatus in ("failed", "busy", "no-answer"):
-        _metrics["calls_failed"] += 1
-
-    return {"received": True}
 
 
 if __name__ == "__main__":

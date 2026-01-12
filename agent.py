@@ -254,25 +254,22 @@ async def entrypoint(ctx: agents.JobContext):
     # Track transcripts
     @session.on("user_input_transcribed")
     def on_user_speech(event):
-        # Event is UserInputTranscribedEvent, extract transcript text
-        text = event.transcript if hasattr(event, 'transcript') else str(event)
-        if event.is_final if hasattr(event, 'is_final') else True:
-            audit.add_transcript("user", text)
-            log.debug("user_speech", text=text)
+        if event.is_final:
+            audit.add_transcript("user", event.transcript)
 
     @session.on("agent_speech_committed")
     def on_agent_speech(message):
-        # Message may be AgentSpeechEvent or string
-        text = message.content if hasattr(message, 'content') else str(message)
-        audit.add_transcript("agent", text)
-        log.debug("agent_speech", text=text)
+        audit.add_transcript("agent", str(message))
 
     # Save audit when session closes
     @session.on("close")
     def on_session_close():
-        audit.finalize()
-        audit.save_sync()
-        log.info("call_ended", call_id=audit.call_id)
+        try:
+            audit.finalize()
+            audit.save_sync()
+            log.info("call_ended", call_id=audit.call_id)
+        except Exception as e:
+            log.error("audit_save_failed", error=str(e))
 
     # Start session
     await session.start(

@@ -1,5 +1,4 @@
 """Audit logging for voice agent calls."""
-import asyncio
 import json
 import uuid
 from datetime import datetime
@@ -111,7 +110,7 @@ class AuditLogger:
         }
 
     def save_sync(self) -> Path:
-        """Save audit to JSON file synchronously."""
+        """Save audit to JSON file."""
         if not self._finalized:
             self.finalize()
 
@@ -119,25 +118,5 @@ class AuditLogger:
         filepath = AUDIT_DIR / filename
 
         filepath.write_text(json.dumps(self.to_dict(), indent=2))
-        log.info("audit_saved", path=str(filepath), call_id=self.call_id)
-        return filepath
-
-    async def save(self) -> Path:
-        """Save audit to JSON file asynchronously."""
-        if not self._finalized:
-            self.finalize()
-
-        filename = f"call-{self.call_id[:8]}.json"
-        filepath = AUDIT_DIR / filename
-
-        # Write asynchronously
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: filepath.write_text(
-                json.dumps(self.to_dict(), indent=2)
-            ),
-        )
-
         log.info("audit_saved", path=str(filepath), call_id=self.call_id)
         return filepath
