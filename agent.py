@@ -253,12 +253,17 @@ async def entrypoint(ctx: agents.JobContext):
 
     # Track transcripts
     @session.on("user_input_transcribed")
-    def on_user_speech(text: str):
-        audit.add_transcript("user", text)
-        log.debug("user_speech", text=text)
+    def on_user_speech(event):
+        # Event is UserInputTranscribedEvent, extract transcript text
+        text = event.transcript if hasattr(event, 'transcript') else str(event)
+        if event.is_final if hasattr(event, 'is_final') else True:
+            audit.add_transcript("user", text)
+            log.debug("user_speech", text=text)
 
     @session.on("agent_speech_committed")
-    def on_agent_speech(text: str):
+    def on_agent_speech(message):
+        # Message may be AgentSpeechEvent or string
+        text = message.content if hasattr(message, 'content') else str(message)
         audit.add_transcript("agent", text)
         log.debug("agent_speech", text=text)
 
