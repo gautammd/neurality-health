@@ -6,7 +6,8 @@ from pathlib import Path
 
 import structlog
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 
 load_dotenv()
 log = structlog.get_logger()
@@ -19,6 +20,31 @@ AUDIT_DIR = Path(__file__).parent / "sample_outputs"
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+
+@app.get("/audits")
+async def list_audits():
+    """List all audit files available for download."""
+    if not AUDIT_DIR.exists():
+        return {"files": []}
+
+    files = [f.name for f in AUDIT_DIR.glob("*.json")]
+    return {"files": sorted(files)}
+
+
+@app.get("/audits/{filename}")
+async def download_audit(filename: str):
+    """Download a specific audit file."""
+    file_path = AUDIT_DIR / filename
+
+    if not file_path.exists() or not file_path.suffix == ".json":
+        raise HTTPException(status_code=404, detail="Audit file not found")
+
+    # Prevent path traversal
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    return FileResponse(file_path, filename=filename, media_type="application/json")
 
 
 @app.get("/metrics")
