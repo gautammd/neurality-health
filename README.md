@@ -85,16 +85,50 @@ cp .env.example .env
 ### Running
 
 ```bash
-# Terminal 1: Start webhook server
+# Terminal 1: Start metrics server
 uvicorn server:app --port 8000
 
 # Terminal 2: Start LiveKit agent
-python -m livekit.agents.cli dev agent.py
+python agent.py dev
 ```
 
-For external access (Twilio webhooks):
-```bash
-ngrok http 8000
+---
+
+## Deploy to Railway
+
+Single container runs both agent and backend via supervisord.
+
+### Setup
+
+1. **Create service**: Railway dashboard → **New Project** → **Deploy from GitHub**
+2. **Add environment variables**:
+   ```
+   LIVEKIT_URL=wss://your-project.livekit.cloud
+   LIVEKIT_API_KEY=APIxxxxxxxx
+   LIVEKIT_API_SECRET=your_secret
+   OPENAI_API_KEY=sk-xxxxxxxx
+   DEEPGRAM_API_KEY=xxxxxxxx
+   ```
+3. **Deploy** - Railway auto-detects Dockerfile and healthcheck
+
+### What Runs
+
+```
+┌─────────────────────────────────────────┐
+│           Railway Container             │
+│                                         │
+│  supervisord                            │
+│      │                                  │
+│      ├── agent.py (LiveKit voice agent) │
+│      │       └── MCP server (subprocess)│
+│      │                                  │
+│      └── server.py (FastAPI backend)    │
+│              ├── GET /health            │
+│              ├── GET /metrics           │
+│              └── POST /voice/status     │
+│                                         │
+│  Healthcheck: /health on PORT           │
+└─────────────────────────────────────────┘
 ```
 
 ---

@@ -2,10 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for LiveKit
+# Install system dependencies for LiveKit and supervisord
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libgstreamer1.0-0 \
+    supervisor \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -18,8 +20,8 @@ COPY . .
 # Download required model files for turn detection
 RUN python agent.py download-files
 
-# Default: run the agent
-# Use SERVICE=backend to run the FastAPI server instead
-ENV SERVICE=agent
+# Default port for Railway
+ENV PORT=8000
 
-CMD ["sh", "-c", "if [ \"$SERVICE\" = 'backend' ]; then uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}; else python agent.py start; fi"]
+# Run both agent and backend via supervisord
+CMD ["supervisord", "-c", "supervisord.conf"]
