@@ -1,0 +1,173 @@
+{
+  "call_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "started_at": "2025-01-11T10:30:00.000Z",
+  "ended_at": "2025-01-11T10:33:45.000Z",
+  "transcript": [
+    {
+      "role": "agent",
+      "text": "Hello! Thank you for calling Neurality Health. I'm here to help you schedule an appointment. May I have your name please?",
+      "ts": "2025-01-11T10:30:01.000Z"
+    },
+    {
+      "role": "user",
+      "text": "Hi, I'm Maya Patel. Do you take Delta Dental PPO for a cleaning? If yes, next Tuesday morning in San Jose. My number is 408-555-1234.",
+      "ts": "2025-01-11T10:30:15.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Thank you, Maya! Let me check your Delta Dental PPO coverage for a cleaning.",
+      "ts": "2025-01-11T10:30:18.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Great news! Your cleaning is covered by Delta Dental PPO with a $25 copay. Let me check availability for next Tuesday morning at our San Jose location.",
+      "ts": "2025-01-11T10:30:25.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "I found several openings. We have 9 AM, 10 AM, and 11 AM available on Tuesday. Which time works best for you?",
+      "ts": "2025-01-11T10:30:32.000Z"
+    },
+    {
+      "role": "user",
+      "text": "9 AM would be perfect.",
+      "ts": "2025-01-11T10:30:40.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Excellent! I'm booking your cleaning appointment for Tuesday at 9 AM at our San Jose clinic with Dr. Sarah Chen. One moment please.",
+      "ts": "2025-01-11T10:30:45.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Your appointment is confirmed! Your confirmation number is ABC123. I'm sending a confirmation text to 408-555-1234 now.",
+      "ts": "2025-01-11T10:30:52.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Is there anything else I can help you with today?",
+      "ts": "2025-01-11T10:31:00.000Z"
+    },
+    {
+      "role": "user",
+      "text": "No, that's all. Thank you!",
+      "ts": "2025-01-11T10:31:08.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "You're welcome, Maya! We look forward to seeing you on Tuesday. Have a great day!",
+      "ts": "2025-01-11T10:31:12.000Z"
+    }
+  ],
+  "intents": [
+    "coverage_check",
+    "check_availability",
+    "book_appointment",
+    "send_sms"
+  ],
+  "slots": {
+    "patient_first": "Maya",
+    "patient_last": "Patel",
+    "phone": "+14085551234",
+    "appointment_type": "cleaning",
+    "time_pref": "next Tuesday morning",
+    "location_id": "loc-sj",
+    "payer": "Delta Dental",
+    "plan": "PPO"
+  },
+  "tool_trace": [
+    {
+      "tool": "check_insurance_coverage",
+      "input": {
+        "payer": "Delta Dental",
+        "plan": "PPO",
+        "procedure_code": "D1110"
+      },
+      "output": {
+        "covered": true,
+        "copay_estimate": 25,
+        "notes": "Cleaning covered twice per year"
+      },
+      "ok": true,
+      "duration_ms": 45
+    },
+    {
+      "tool": "get_provider_availability",
+      "input": {
+        "location_id": "loc-sj",
+        "provider_id": "prov-001",
+        "date_range": {
+          "start": "2025-01-14",
+          "end": "2025-01-14"
+        },
+        "appointment_type": "cleaning"
+      },
+      "output": {
+        "slots": [
+          {
+            "start": "2025-01-14T09:00:00.000Z",
+            "end": "2025-01-14T10:00:00.000Z"
+          },
+          {
+            "start": "2025-01-14T10:00:00.000Z",
+            "end": "2025-01-14T11:00:00.000Z"
+          },
+          {
+            "start": "2025-01-14T11:00:00.000Z",
+            "end": "2025-01-14T12:00:00.000Z"
+          }
+        ]
+      },
+      "ok": true,
+      "duration_ms": 32
+    },
+    {
+      "tool": "book_appointment",
+      "input": {
+        "patient": {
+          "first": "Maya",
+          "last": "Patel",
+          "phone": "+14085551234"
+        },
+        "provider_id": "prov-001",
+        "slot": {
+          "start": "2025-01-14T09:00:00.000Z",
+          "end": "2025-01-14T10:00:00.000Z"
+        },
+        "appointment_type": "cleaning",
+        "location_id": "loc-sj",
+        "idempotency_key": "f47ac10b-58cc-4372-a567-0e02b2c3d479-1736594445000"
+      },
+      "output": {
+        "confirmation_id": "ABC123",
+        "status": "booked"
+      },
+      "ok": true,
+      "duration_ms": 28
+    },
+    {
+      "tool": "send_sms",
+      "input": {
+        "to": "+14085551234",
+        "message": "Hi Maya! Your cleaning appointment is confirmed for Tuesday, Jan 14 at 9:00 AM at Neurality Health San Jose (123 Main Street). Confirmation: ABC123. Reply HELP for assistance."
+      },
+      "output": {
+        "queued": true,
+        "message_id": "sms_a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      },
+      "ok": true,
+      "duration_ms": 15
+    }
+  ],
+  "outcome": {
+    "booked": true,
+    "confirmation_id": "ABC123",
+    "next_steps": "SMS sent"
+  },
+  "prompt_version": "1.0.0",
+  "metrics": {
+    "ttfb_ms": 850,
+    "avg_turn_latency_ms": 1250,
+    "total_duration_ms": 225000
+  }
+}

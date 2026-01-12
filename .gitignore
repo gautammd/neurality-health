@@ -1,0 +1,45 @@
+# Environment
+.env
+.env.local
+.env.*.local
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.eggs/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Audit logs (generated at runtime)
+audits/*.json
+audit_logs/
+
+# Logs
+*.log
+
+# Node (if any)
+node_modules/
+dist/
+
+# Model files (downloaded at build)
+*.onnx

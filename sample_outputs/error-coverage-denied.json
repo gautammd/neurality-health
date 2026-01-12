@@ -1,0 +1,96 @@
+{
+  "call_id": "e8b7c6d5-4a3b-2c1d-0e9f-8a7b6c5d4e3f",
+  "started_at": "2025-01-11T11:00:00.000Z",
+  "ended_at": "2025-01-11T11:02:30.000Z",
+  "transcript": [
+    {
+      "role": "agent",
+      "text": "Hello! Thank you for calling Neurality Health. I'm here to help you schedule an appointment. May I have your name please?",
+      "ts": "2025-01-11T11:00:01.000Z"
+    },
+    {
+      "role": "user",
+      "text": "Hi, this is Robert Johnson. I have SecureHealth Basic plan and I need a crown.",
+      "ts": "2025-01-11T11:00:12.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Thank you, Robert. Let me check your SecureHealth Basic coverage for a crown procedure.",
+      "ts": "2025-01-11T11:00:18.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "I'm sorry, Robert, but I wasn't able to find coverage information for SecureHealth Basic in our system. The cash-pay price for a crown is $1,200. Would you like me to proceed with scheduling at the cash-pay rate, or would you prefer I take a message for our billing team to verify your coverage?",
+      "ts": "2025-01-11T11:00:28.000Z"
+    },
+    {
+      "role": "user",
+      "text": "That's too expensive. Can you just take a message for the billing team?",
+      "ts": "2025-01-11T11:00:42.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Of course! I'll have our billing team reach out to verify your SecureHealth Basic coverage for the crown procedure. They'll contact you within 1-2 business days. What's the best phone number to reach you?",
+      "ts": "2025-01-11T11:00:50.000Z"
+    },
+    {
+      "role": "user",
+      "text": "510-555-9876",
+      "ts": "2025-01-11T11:01:00.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Got it! I've noted that Robert Johnson at 510-555-9876 needs coverage verification for SecureHealth Basic for a crown procedure. Our billing team will follow up soon. Is there anything else I can help you with?",
+      "ts": "2025-01-11T11:01:10.000Z"
+    },
+    {
+      "role": "user",
+      "text": "No, that's all for now.",
+      "ts": "2025-01-11T11:01:20.000Z"
+    },
+    {
+      "role": "agent",
+      "text": "Thank you for calling Neurality Health, Robert. Have a great day!",
+      "ts": "2025-01-11T11:01:25.000Z"
+    }
+  ],
+  "intents": [
+    "coverage_check"
+  ],
+  "slots": {
+    "patient_first": "Robert",
+    "patient_last": "Johnson",
+    "phone": "+15105559876",
+    "appointment_type": "crown",
+    "payer": "SecureHealth",
+    "plan": "Basic"
+  },
+  "tool_trace": [
+    {
+      "tool": "check_insurance_coverage",
+      "input": {
+        "payer": "SecureHealth",
+        "plan": "Basic",
+        "procedure_code": "D2740"
+      },
+      "output": {
+        "covered": false,
+        "copay_estimate": 0,
+        "notes": "No coverage information found for SecureHealth Basic. Cash-pay estimate: $1200"
+      },
+      "ok": true,
+      "duration_ms": 38
+    }
+  ],
+  "outcome": {
+    "booked": false,
+    "error": "Coverage not available - patient opted for billing team callback",
+    "next_steps": "Billing team to verify SecureHealth Basic coverage and contact patient"
+  },
+  "prompt_version": "1.0.0",
+  "metrics": {
+    "ttfb_ms": 780,
+    "avg_turn_latency_ms": 1100,
+    "total_duration_ms": 150000
+  }
+}

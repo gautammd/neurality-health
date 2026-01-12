@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  # FastAPI backend for Twilio webhooks
+  backend:
+    build: .
+    command: uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - ./sample_outputs:/app/sample_outputs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # LiveKit voice agent worker
+  agent:
+    build: .
+    command: python agent.py dev
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - ./audits:/app/audits
+    depends_on:
+      - backend
