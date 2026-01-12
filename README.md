@@ -94,6 +94,109 @@ python agent.py dev
 
 ---
 
+## Twilio + LiveKit SIP Setup
+
+Complete setup guide to connect phone calls to your voice agent.
+
+### Step 1: LiveKit Cloud Setup
+
+1. **Create account** at [cloud.livekit.io](https://cloud.livekit.io)
+
+2. **Create a project** and note your credentials:
+   - `LIVEKIT_URL` (e.g., `wss://your-project.livekit.cloud`)
+   - `LIVEKIT_API_KEY` (e.g., `APIxxxxxxxx`)
+   - `LIVEKIT_API_SECRET`
+
+3. **Configure SIP Inbound Trunk**:
+   - Go to **Project Settings** → **SIP**
+   - Click **Create Inbound Trunk**
+   - Name: `twilio-inbound`
+   - Allowed addresses: Leave empty (or add Twilio's IP ranges for security)
+   - Click **Create**
+   - Note the **SIP URI** (e.g., `sip:xxxxxxxxx@sip.livekit.cloud`)
+
+4. **Create Dispatch Rule** (routes calls to your agent):
+   - Go to **SIP** → **Dispatch Rules**
+   - Click **Create Dispatch Rule**
+   - Name: `health-agent-dispatch`
+   - Rule type: **Individual**
+   - Room prefix: `call-` (rooms will be named `call-<unique-id>`)
+   - Click **Create**
+
+### Step 2: Twilio SIP Trunk Setup
+
+1. **Create account** at [twilio.com](https://www.twilio.com) (trial works)
+
+2. **Buy a phone number**:
+   - Go to **Phone Numbers** → **Buy a Number**
+   - Choose a number with Voice capability
+
+3. **Create SIP Trunk**:
+   - Go to **Elastic SIP Trunking** → **Trunks**
+   - Click **Create new SIP Trunk**
+   - Name: `livekit-trunk`
+
+4. **Configure Origination** (where Twilio sends calls):
+   - In your trunk, go to **Origination**
+   - Click **Add new Origination URI**
+   - Origination SIP URI: Paste the LiveKit SIP URI from Step 1.3
+     ```
+     sip:xxxxxxxxx@sip.livekit.cloud
+     ```
+   - Priority: 10, Weight: 10
+   - Click **Add**
+
+5. **Connect Phone Number to Trunk**:
+   - In your trunk, go to **Numbers**
+   - Click **Add a Number**
+   - Select your phone number from Step 2.2
+
+### Step 3: API Keys
+
+1. **OpenAI**: Get API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+
+2. **Deepgram**: Get API key from [console.deepgram.com](https://console.deepgram.com)
+
+### Step 4: Configure Environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+```env
+LIVEKIT_URL=wss://your-project.livekit.cloud
+LIVEKIT_API_KEY=APIxxxxxxxx
+LIVEKIT_API_SECRET=your_secret
+OPENAI_API_KEY=sk-xxxxxxxx
+DEEPGRAM_API_KEY=xxxxxxxx
+```
+
+### Step 5: Test
+
+1. Start the agent locally:
+   ```bash
+   python agent.py dev
+   ```
+
+2. Call your Twilio phone number
+
+3. The call flow:
+   ```
+   Your Phone → Twilio → SIP Trunk → LiveKit → Your Agent
+   ```
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Call doesn't connect | Check Twilio trunk Origination URI matches LiveKit SIP URI |
+| Agent doesn't answer | Verify `python agent.py dev` is running and connected |
+| No audio | Check Deepgram API key is valid |
+| Agent doesn't respond | Check OpenAI API key is valid |
+
+---
+
 ## Deploy to Railway
 
 Single container runs both agent and backend via supervisord.
@@ -125,7 +228,8 @@ Single container runs both agent and backend via supervisord.
 │      └── server.py (FastAPI backend)    │
 │              ├── GET /health            │
 │              ├── GET /metrics           │
-│              └── POST /voice/status     │
+│              ├── GET /audits            │
+│              └── GET /audits/{filename} │
 │                                         │
 │  Healthcheck: /health on PORT           │
 └─────────────────────────────────────────┘
@@ -136,13 +240,7 @@ Single container runs both agent and backend via supervisord.
 ## Environment Variables
 
 ```env
-# Twilio
-TWILIO_ACCOUNT_SID=ACxxxxxxxx
-TWILIO_AUTH_TOKEN=your_token
-TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
-TWILIO_SIP_DOMAIN=neurality.sip.twilio.com
-
-# LiveKit
+# LiveKit Cloud (https://cloud.livekit.io)
 LIVEKIT_URL=wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=APIxxxxxxxx
 LIVEKIT_API_SECRET=your_secret
@@ -163,10 +261,10 @@ PORT=8000
 ## Architecture
 
 ```
-PSTN Call → Twilio → SIP Trunk → LiveKit Cloud
+PSTN Call → Twilio SIP Trunk → LiveKit Cloud (Direct, no webhook)
                                       ↓
-                              LiveKit Room
-                              (dispatch rule)
+                              LiveKit SIP Gateway
+                              (dispatch rule creates room)
                                       ↓
                         LiveKit Agent (health-agent)
                            ↓        ↓        ↓
@@ -178,17 +276,18 @@ PSTN Call → Twilio → SIP Trunk → LiveKit Cloud
                                       ↓
                         tools.py + fixtures/
                                       ↓
-                              Audit JSON
+                              Audit JSON (sample_outputs/)
 ```
 
 ### Components
 
 | Component | Purpose |
 |-----------|---------|
-| FastAPI Server | Handles Twilio voice webhooks, returns TwiML |
+| Twilio SIP Trunk | Routes PSTN calls directly to LiveKit (no webhooks) |
 | LiveKit Agents | Voice agent framework with VAD, STT, LLM, TTS |
 | VoiceAssistant | Orchestrates conversation, handles barge-in |
 | FunctionContext | Exposes tools to LLM via function calling |
+| FastAPI Server | Metrics, health checks, audit file downloads |
 | Audit Logger | Creates per-call JSON artifacts |
 
 ---
@@ -197,11 +296,10 @@ PSTN Call → Twilio → SIP Trunk → LiveKit Cloud
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/voice` | POST | Twilio voice webhook (returns TwiML) |
-| `/voice/status` | POST | Call status callbacks |
-| `/voice/stream` | POST | Alternative: Media Streams webhook |
-| `/voice/fallback` | POST | Fallback error handler |
 | `/health` | GET | Health check |
+| `/metrics` | GET | Call analytics from audit files |
+| `/audits` | GET | List available audit files |
+| `/audits/{filename}` | GET | Download specific audit file |
 
 ---
 
