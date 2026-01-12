@@ -1,5 +1,6 @@
 """Audit logging for voice agent calls."""
 import json
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -27,12 +28,14 @@ class AuditLogger:
         self.intents: list[str] = []
         self.slots: dict = {}
         self.tool_trace: list[dict] = []
+        self.turns: list[dict] = []  # Turn-level latency tracking
         self.outcome: dict = {
             "booked": False,
             "confirmation_id": None,
             "next_steps": None,
         }
         self._finalized = False
+        self._current_turn_start: float | None = None
 
     def add_transcript(
         self,
@@ -50,6 +53,21 @@ class AuditLogger:
         """Add a detected intent (deduplicated)."""
         if intent not in self.intents:
             self.intents.append(intent)
+
+    def start_turn(self) -> None:
+        """Mark start of a turn (when user finishes speaking)."""
+        self._current_turn_start = time.time()
+
+    def end_turn(self, ttfb_ms: float | None = None) -> None:
+        """Mark end of a turn (when agent finishes speaking)."""
+        if self._current_turn_start is None:
+            return
+        turn_latency_ms = (time.time() - self._current_turn_start) * 1000
+        self.turns.append({
+            "ttfb_ms": round(ttfb_ms, 2) if ttfb_ms else None,
+            "turn_latency_ms": round(turn_latency_ms, 2),
+        })
+        self._current_turn_start = None
 
     def set_slot(self, name: str, value: str, confidence: float = 1.0) -> None:
         """Set a validated slot value."""
@@ -106,6 +124,7 @@ class AuditLogger:
             "intents": self.intents,
             "slots": self.slots,
             "tool_trace": self.tool_trace,
+            "turns": self.turns,
             "outcome": self.outcome,
         }
 

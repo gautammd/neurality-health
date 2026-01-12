@@ -261,15 +261,37 @@ PYTHONPATH=. pytest --cov=. --cov-report=term-missing
 - **TTFB**: ≤ 900ms (first byte of TTS audio)
 - **Turn Latency P95**: ≤ 2.5s
 
-### Measurement Points
-- `ttfb_ms`: Time from user utterance end to first TTS audio byte
-- `turn_latency_ms`: Full turn processing time (STT → LLM → TTS)
-
 ### How Latency is Measured
-1. **Tool latency**: Tracked in `mcp_client.py` - each MCP tool call records `latency_ms`
-2. **Audit logs**: Each tool trace includes `duration_ms`
-3. **Metrics endpoint**: `GET /metrics` returns aggregated latency stats
-4. **Agent logs**: Deepgram STT/TTS report `transcript_delay` in DEBUG logs
+
+| Metric | Where Measured | Code Location |
+|--------|----------------|---------------|
+| `ttfb_ms` | User speech end → Agent speech start | `agent.py:266-269` |
+| `turn_latency_ms` | User speech end → Agent speech end | `agent.py:271-274` |
+| `tool_latency_ms` | MCP tool call duration | `agent.py` tool methods |
+
+**Measurement flow:**
+```
+User stops speaking (is_final=True)
+    → start_turn() records timestamp
+    → agent_speech_started event
+    → TTFB = now - start_turn
+    → agent_speech_committed event
+    → turn_latency = now - start_turn
+```
+
+**View metrics:** `GET /metrics` returns:
+```json
+{
+  "latency": {
+    "avg_ttfb_ms": 450.2,
+    "p95_ttfb_ms": 820.5,
+    "target_ttfb_ms": 900,
+    "avg_turn_latency_ms": 1850.3,
+    "p95_turn_latency_ms": 2400.1,
+    "target_p95_turn_ms": 2500
+  }
+}
+```
 
 ### Reliability Features
 - **Retries**: 3 attempts with exponential backoff (0.5s, 1s, 1.5s)
@@ -296,8 +318,7 @@ neurality_health/
 ├── prompts/
 │   └── manifest.json     # Versioned prompts
 ├── tests/                # Test suite
-├── audits/               # Runtime audit JSON files
-├── sample_outputs/       # Example audit artifacts
+├── sample_outputs/       # Audit JSON files (runtime)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile

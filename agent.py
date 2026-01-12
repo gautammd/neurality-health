@@ -251,15 +251,27 @@ async def entrypoint(ctx: agents.JobContext):
         turn_detection=MultilingualModel(),
     )
 
-    # Track transcripts
+    # Track transcripts and turn latency
+    import time
+    _turn_state = {"start": None, "ttfb": None}
+
     @session.on("user_input_transcribed")
     def on_user_speech(event):
         if event.is_final:
             audit.add_transcript("user", event.transcript)
+            audit.start_turn()
+            _turn_state["start"] = time.time()
+            _turn_state["ttfb"] = None
+
+    @session.on("agent_speech_started")
+    def on_agent_started(message):
+        if _turn_state["start"] and _turn_state["ttfb"] is None:
+            _turn_state["ttfb"] = (time.time() - _turn_state["start"]) * 1000
 
     @session.on("agent_speech_committed")
     def on_agent_speech(message):
         audit.add_transcript("agent", str(message))
+        audit.end_turn(ttfb_ms=_turn_state["ttfb"])
 
     # Save audit when session closes
     @session.on("close")
