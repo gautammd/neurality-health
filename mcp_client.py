@@ -24,6 +24,15 @@ _metrics = {
     "latencies_ms": [],
 }
 
+# Circuit breaker state
+_circuit_breaker = {
+    "failures": 0,
+    "threshold": 5,  # Open circuit after 5 consecutive failures
+    "reset_after": 30,  # Seconds before attempting reset
+    "opened_at": None,
+    "state": "closed",  # closed, open, half-open
+}
+
 
 def get_metrics() -> dict:
     """Get current metrics."""
@@ -85,8 +94,19 @@ class MCPToolClient:
             await self.connect()
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict:
-        """Call a tool with retry logic."""
+        """Call a tool with retry logic and circuit breaker."""
         _metrics["tool_calls"] += 1
+
+        # Circuit breaker check
+        if _circuit_breaker["state"] == "open":
+            elapsed = time.time() - (_circuit_breaker["opened_at"] or 0)
+            if elapsed < _circuit_breaker["reset_after"]:
+                log.warning("circuit_breaker_open", tool=name)
+                return {"error": "Circuit breaker open - service temporarily unavailable"}
+            # Try half-open
+            _circuit_breaker["state"] = "half-open"
+            log.info("circuit_breaker_half_open")
+
         last_error = None
 
         for attempt in range(self.max_retries):
@@ -102,6 +122,10 @@ class MCPToolClient:
                 # Track latency
                 latency_ms = (time.time() - start_time) * 1000
                 _metrics["latencies_ms"].append(latency_ms)
+
+                # Success - reset circuit breaker
+                _circuit_breaker["failures"] = 0
+                _circuit_breaker["state"] = "closed"
 
                 # Parse result
                 if result.content and len(result.content) > 0:
@@ -123,7 +147,15 @@ class MCPToolClient:
                     _metrics["tool_retries"] += 1
                     await asyncio.sleep(self.retry_delay * (attempt + 1))  # Exponential backoff
 
+        # All retries failed - update circuit breaker
         _metrics["tool_errors"] += 1
+        _circuit_breaker["failures"] += 1
+
+        if _circuit_breaker["failures"] >= _circuit_breaker["threshold"]:
+            _circuit_breaker["state"] = "open"
+            _circuit_breaker["opened_at"] = time.time()
+            log.error("circuit_breaker_opened", failures=_circuit_breaker["failures"])
+
         log.error("mcp_tool_failed", tool=name, error=str(last_error))
         return {"error": f"Tool call failed after {self.max_retries} attempts: {last_error}"}
 

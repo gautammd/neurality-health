@@ -26,6 +26,6 @@ services:
       - .env
     volumes:
       - .:/app
-      - ./audits:/app/audits
+      - ./sample_outputs:/app/sample_outputs
     depends_on:
       - backend

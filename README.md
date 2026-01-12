@@ -129,21 +129,22 @@ PORT=8000
 ## Architecture
 
 ```
-PSTN Call → Twilio → Webhook Server (FastAPI)
-                          ↓
-                    TwiML: <Dial><Sip>
-                          ↓
-                 Twilio SIP → LiveKit SIP
-                          ↓
-                    LiveKit Room
-                          ↓
-              LiveKit Agents VoiceAssistant
-                 ↓        ↓        ↓
-              Silero    OpenAI   Deepgram
-               VAD      GPT-4o   STT/TTS
-                          ↓
-                    Function Calling
-                    (Tool Execution)
+PSTN Call → Twilio → SIP Trunk → LiveKit Cloud
+                                      ↓
+                              LiveKit Room
+                              (dispatch rule)
+                                      ↓
+                        LiveKit Agent (health-agent)
+                           ↓        ↓        ↓
+                        Silero    OpenAI   Deepgram
+                         VAD      GPT-4o   STT/TTS
+                                      ↓
+                              MCP Tool Calls
+                     (via mcp_client → mcp_server)
+                                      ↓
+                        tools.py + fixtures/
+                                      ↓
+                              Audit JSON
 ```
 
 ### Components
@@ -230,6 +231,17 @@ PYTHONPATH=. pytest --cov=. --cov-report=term-missing
 - `ttfb_ms`: Time from user utterance end to first TTS audio byte
 - `turn_latency_ms`: Full turn processing time (STT → LLM → TTS)
 
+### How Latency is Measured
+1. **Tool latency**: Tracked in `mcp_client.py` - each MCP tool call records `latency_ms`
+2. **Audit logs**: Each tool trace includes `duration_ms`
+3. **Metrics endpoint**: `GET /metrics` returns aggregated latency stats
+4. **Agent logs**: Deepgram STT/TTS report `transcript_delay` in DEBUG logs
+
+### Reliability Features
+- **Retries**: 3 attempts with exponential backoff (0.5s, 1s, 1.5s)
+- **Circuit Breaker**: Opens after 5 consecutive failures, resets after 30s
+- **Idempotency**: `book_appointment` uses `idempotency_key` to prevent duplicates
+
 ---
 
 ## Project Structure
@@ -237,9 +249,11 @@ PYTHONPATH=. pytest --cov=. --cov-report=term-missing
 ```
 neurality_health/
 ├── agent.py              # LiveKit voice agent
-├── server.py             # FastAPI webhook server
+├── server.py             # FastAPI metrics server
+├── mcp_server.py         # MCP server exposing tools
+├── mcp_client.py         # MCP client with retry/circuit breaker
 ├── audit.py              # Audit logging
-├── tools.py              # MCP tools with Pydantic
+├── tools.py              # Tool implementations with Pydantic
 ├── fixtures/             # Mock data
 │   ├── __init__.py
 │   ├── providers.py      # Provider/location data
@@ -248,6 +262,7 @@ neurality_health/
 ├── prompts/
 │   └── manifest.json     # Versioned prompts
 ├── tests/                # Test suite
+├── audits/               # Runtime audit JSON files
 ├── sample_outputs/       # Example audit artifacts
 ├── Dockerfile
 ├── docker-compose.yml

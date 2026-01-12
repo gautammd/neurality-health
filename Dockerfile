@@ -18,4 +18,8 @@ COPY . .
 # Download required model files for turn detection
 RUN python agent.py download-files
 
-CMD ["python", "-m", "livekit.agents.cli", "start", "agent.py"]
+# Default: run the agent
+# Use SERVICE=backend to run the FastAPI server instead
+ENV SERVICE=agent
+
+CMD ["sh", "-c", "if [ \"$SERVICE\" = 'backend' ]; then uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}; else python agent.py start; fi"]

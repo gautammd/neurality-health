@@ -31,8 +31,7 @@ htmlcov/
 coverage/
 
 # Audit logs (generated at runtime)
-audits/*.json
-audit_logs/
+sample_outputs/*.json
 
 # Logs
 *.log

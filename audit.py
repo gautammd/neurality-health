@@ -11,7 +11,7 @@ import structlog
 log = structlog.get_logger()
 
 # Audit output directory
-AUDIT_DIR = Path(__file__).parent / "audits"
+AUDIT_DIR = Path(__file__).parent / "sample_outputs"
 AUDIT_DIR.mkdir(exist_ok=True)
 
 
